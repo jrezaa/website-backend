@@ -1,9 +1,17 @@
+using System.Collections.Concurrent;
+using System.Net;
+using System.Net.WebSockets;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.WebHost.UseUrls("http://localhost:6969");
 
 var app = builder.Build();
 
@@ -15,31 +23,100 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-var summaries = new[]
+app.UseWebSockets();
+var rooms = new ConcurrentDictionary<string, Room>();
+app.Map("/controller", async context =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    if (context.WebSockets.IsWebSocketRequest)
+    {
+        using var ws = await context.WebSockets.AcceptWebSocketAsync();
+        var clientIp = context.Connection.RemoteIpAddress;
 
-app.MapGet("/weatherforecast", () =>
+        if (clientIp == null)
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("Unable to determine client IP.");
+            return;
+        }
+
+        // Determine the subnet based on the IP address (assuming IPv4)
+        var subnet = GetSubnet(clientIp);
+        var isController = context.Request.Query["isController"] == "1";
+
+        // Ensure a room exists for this subnet
+        var room = rooms.GetOrAdd(subnet, new Room());
+
+        if (isController)
+        {
+            room.Controller = ws;
+        }
+        else
+        {
+            room.Clients.TryAdd(context.Connection.Id, ws);
+        }
+
+        while (ws.State == WebSocketState.Open)
+        {
+            var buffer = new byte[1024 * 4];
+            var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+            if (result.MessageType == WebSocketMessageType.Text)
+            {
+                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+
+                if (isController)
+                {
+                    // Broadcast message to all clients in the room
+                    foreach (var client in room.Clients.Values)
+                    {
+                        if (client.State == WebSocketState.Open)
+                        {
+                            await client.SendAsync(
+                                new ArraySegment<byte>(Encoding.UTF8.GetBytes(message)),
+                                WebSocketMessageType.Text,
+                                true,
+                                CancellationToken.None
+                            );
+                        }
+                    }
+                }
+                else
+                {
+                    // Handle non-controller messages (if necessary)
+                }
+            }
+
+            if (ws.State == WebSocketState.CloseReceived && result.CloseStatus.HasValue)
+            {
+                if (isController)
+                {
+                    room.Controller = null;
+                }
+                else
+                {
+                    room.Clients.TryRemove(context.Connection.Id, out _);
+                }
+                await ws.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+            }
+        }
+    }
+    else
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsync("WebSocket requests only.");
+    }
+});
+await app.RunAsync();
+
+
+string GetSubnet(IPAddress ipAddress)
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    Console.WriteLine("HELLO");
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+    // Assuming IPv4 and subnet mask of 255.255.255.0 (Class C network)
+    var ipBytes = ipAddress.GetAddressBytes();
+    return $"{ipBytes[0]}.{ipBytes[1]}.{ipBytes[2]}.0";
+}
+public class Room
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    public WebSocket? Controller { get; set; }
+    public ConcurrentDictionary<string, WebSocket> Clients { get; } = new();
 }
