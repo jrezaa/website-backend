@@ -56,7 +56,7 @@ app.Map("/controller", async context =>
         {
             room.Clients.TryAdd(context.Connection.Id, ws);
         }
-        app.Logger.LogInformation($"Client Ip: {clientIp} joined room: {subnet}");y
+        app.Logger.LogInformation($"Client Ip: {clientIp} joined room: {subnet}");
 
         while (ws.State == WebSocketState.Open)
         {
