@@ -21,7 +21,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+app.Logger.LogInformation("*** BACKEND IS NOW ONLINE ***");
 app.UseHttpsRedirection();
 app.UseWebSockets();
 var rooms = new ConcurrentDictionary<string, Room>();
