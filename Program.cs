@@ -22,6 +22,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.Logger.LogInformation("*** BACKEND IS NOW ONLINE ***");
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
 app.UseWebSockets();
 var rooms = new ConcurrentDictionary<string, Room>();
@@ -120,3 +121,27 @@ public class Room
     public WebSocket? Controller { get; set; }
     public ConcurrentDictionary<string, WebSocket> Clients { get; } = new();
 }
+
+
+public class RequestLoggingMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public RequestLoggingMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        // Log the request details to the console
+        Console.WriteLine($"Request Path: {context.Request.Path}");
+        Console.WriteLine($"Request Method: {context.Request.Method}");
+        Console.WriteLine($"Request Headers: {string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}: {h.Value}"))}");
+        Console.WriteLine($"Request Query String: {context.Request.QueryString}");
+
+        // Call the next middleware in the pipeline
+        await _next(context);
+    }
+}
+
