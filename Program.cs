@@ -66,7 +66,7 @@ app.Map("/controller", async context =>
             {
                 var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
 
-                if (!isController)
+                if (isController)
                 {
                     // Broadcast message to all clients in the room
                     foreach (var client in room.Clients.Values)
