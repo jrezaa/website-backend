@@ -65,7 +65,7 @@ app.Map("/controller", async context =>
             if (result.MessageType == WebSocketMessageType.Text)
             {
                 var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-
+                Console.WriteLine($"Client ID {context.Connection.Id} has sent: {message}");
                 if (isController)
                 {
                     // Broadcast message to all clients in the room
@@ -140,7 +140,7 @@ public class RequestLoggingMiddleware
         Console.WriteLine($"Request Method: {context.Request.Method}");
         Console.WriteLine($"Request Headers: {string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}: {h.Value}"))}");
         Console.WriteLine($"Request Query String: {context.Request.QueryString}");
-        Console.WriteLine($"Request IP: {context.Connection.RemoteIpAddress}");
+        Console.WriteLine($"Request ID: {context.Connection.Id}");
 
         // Call the next middleware in the pipeline
         await _next(context);
