@@ -21,6 +21,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 app.Logger.LogInformation("*** BACKEND IS NOW ONLINE ***");
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
@@ -55,6 +56,7 @@ app.Map("/controller", async context =>
         {
             room.Clients.TryAdd(context.Connection.Id, ws);
         }
+        app.Logger.LogInformation($"Client Ip: {clientIp} joined room: {subnet}");y
 
         while (ws.State == WebSocketState.Open)
         {
@@ -65,7 +67,7 @@ app.Map("/controller", async context =>
             {
                 var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
 
-                if (isController)
+                if (!isController)
                 {
                     // Broadcast message to all clients in the room
                     foreach (var client in room.Clients.Values)
