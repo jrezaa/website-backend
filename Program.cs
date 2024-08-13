@@ -56,7 +56,6 @@ app.Map("/controller", async context =>
         {
             room.Clients.TryAdd(context.Connection.Id, ws);
         }
-        app.Logger.LogInformation($"Client Ip: {clientIp} joined room: {subnet}");
 
         while (ws.State == WebSocketState.Open)
         {
@@ -141,6 +140,7 @@ public class RequestLoggingMiddleware
         Console.WriteLine($"Request Method: {context.Request.Method}");
         Console.WriteLine($"Request Headers: {string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}: {h.Value}"))}");
         Console.WriteLine($"Request Query String: {context.Request.QueryString}");
+        Console.WriteLine($"Request IP: {context.Connection.RemoteIpAddress}");
 
         // Call the next middleware in the pipeline
         await _next(context);
